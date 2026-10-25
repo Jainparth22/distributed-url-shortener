@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>URL Shortener — Distributed Systems</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #090d1a; --surface: #111827; --border: #1e2a3a;
+    --accent: #3b82f6; --accent2: #60a5fa; --text: #e2e8f0;
+    --muted: #64748b; --success: #10b981; --error: #ef4444;
+    --warn: #f59e0b; --card: #0f172a;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+  
+  header { background: linear-gradient(135deg, #0a1628 0%, #1a2744 100%);
+    border-bottom: 1px solid var(--border); padding: 20px 32px; display: flex; align-items: center; gap: 16px; }
+  .badge { background: var(--accent); color: #fff; font-size: 11px; font-weight: 700;
+    padding: 3px 10px; border-radius: 20px; letter-spacing: 1px; }
+  header h1 { font-size: 22px; font-weight: 700; }
+  header p  { font-size: 13px; color: var(--muted); margin-top: 2px; }
+
+  .container { max-width: 1100px; margin: 0 auto; padding: 32px 24px; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+  
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 24px; }
+  .card h2 { font-size: 14px; font-weight: 600; color: var(--accent2); margin-bottom: 16px;
+    display: flex; align-items: center; gap: 8px; }
+  .card h2 .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); 
+    box-shadow: 0 0 8px var(--accent); animation: pulse 2s infinite; }
+
+  label { display: block; font-size: 12px; font-weight: 500; color: var(--muted); margin-bottom: 6px; }
+  input, select { width: 100%; padding: 10px 14px; background: var(--bg); border: 1px solid var(--border);
+    border-radius: 8px; color: var(--text); font-size: 13px; font-family: inherit; outline: none;
+    transition: border-color .2s; }
+  input:focus, select:focus { border-color: var(--accent); }
+  .input-row { margin-bottom: 12px; }
+
+  button { padding: 10px 20px; border: none; border-radius: 8px; font-family: inherit;
+    font-size: 13px; font-weight: 600; cursor: pointer; transition: all .2s; }
+  .btn-primary { background: var(--accent); color: #fff; }
+  .btn-primary:hover { background: var(--accent2); transform: translateY(-1px); }
+  .btn-sm { padding: 6px 14px; font-size: 12px; background: var(--border); color: var(--text); }
+  .btn-sm:hover { background: var(--accent); color: #fff; }
+  .btn-danger { background: #7f1d1d; color: #fca5a5; }
+  .btn-row { display: flex; gap: 8px; margin-top: 12px; }
+
+  .response-box { background: var(--bg); border: 1px solid var(--border); border-radius: 8px;
+    padding: 14px; font-family: 'JetBrains Mono', monospace; font-size: 12px;
+    min-height: 80px; color: #94a3b8; white-space: pre-wrap; word-break: break-all;
+    max-height: 300px; overflow-y: auto; }
+  .response-box.success { border-color: var(--success); color: #6ee7b7; }
+  .response-box.error   { border-color: var(--error);   color: #fca5a5; }
+
+  .stat-box { background: var(--card); border: 1px solid var(--border); border-radius: 10px;
+    padding: 16px; text-align: center; }
+  .stat-box .val { font-size: 28px; font-weight: 700; color: var(--accent2); }
+  .stat-box .key { font-size: 11px; color: var(--muted); margin-top: 4px; text-transform: uppercase; letter-spacing: 1px; }
+
+  .url-list { list-style: none; }
+  .url-list li { display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 12px; border-radius: 8px; margin-bottom: 6px; background: var(--bg);
+    border: 1px solid var(--border); font-size: 12px; gap: 8px; }
+  .short-code { font-family: 'JetBrains Mono', monospace; color: var(--accent2); font-weight: 600; }
+  .orig-url   { color: var(--muted); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  .concept-chip { display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: 11px;
+    font-weight: 500; margin: 2px; background: #1e2a3a; color: var(--accent2); border: 1px solid var(--border); }
+
+  .progress-bar { height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; margin-top: 6px; }
+  .progress-fill { height: 100%; background: var(--accent); border-radius: 3px; transition: width .5s; }
+
+  .tag { padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; }
+  .tag-hit  { background: #064e3b; color: #6ee7b7; }
+  .tag-miss { background: #7f1d1d; color: #fca5a5; }
+
+  @keyframes pulse { 0%,100%{ opacity:1; } 50%{ opacity:.4; } }
+  .animate-in { animation: fadeUp .3s ease; }
+  @keyframes fadeUp { from{ opacity:0; transform: translateY(8px); } to{ opacity:1; transform: translateY(0); } }
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <div class="badge">HLD</div>
+    <h1>🔗 URL Shortener</h1>
+    <p>Base62 · LRU Cache · Single-Flight · JWT Auth · SQLite · Token Bucket</p>
+  </div>
+</header>
+
+  <!-- Auth notice -->
+  <div class="card" style="margin-bottom:20px; border-color:#f59e0b44;">
+    <h2><span style="width:8px;height:8px;border-radius:50%;background:#f59e0b;box-shadow:0 0 8px #f59e0b;display:inline-block;margin-right:8px;"></span>Step 0 — Get JWT Token (required to shorten)</h2>
+    <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;">
+      <div style="flex:1;min-width:180px;">
+        <label>Your User ID</label>
+        <input id="user-id" value="demo_user" placeholder="any username">
+      </div>
+      <button class="btn-primary" onclick="getToken()" style="white-space:nowrap;">🔑 Get Token</button>
+      <span id="token-status" style="font-size:12px;padding-bottom:2px;"></span>
+    </div>
+    <div class="response-box" id="token-resp" style="margin-top:10px;">Click "Get Token" → token stored in localStorage → auto-attached to requests</div>
+  </div>
+
+  <!-- Stats row -->
+  <div class="grid-3" id="stats-row" style="margin-bottom:20px;">
+    <div class="stat-box"><div class="val" id="s-total">0</div><div class="key">URLs Created</div></div>
+    <div class="stat-box"><div class="val" id="s-hit">–</div><div class="key">Cache Hit Rate</div></div>
+    <div class="stat-box"><div class="val" id="s-dedup">0</div><div class="key">Single-Flight Deduped</div></div>
+  </div>
+
+  <div class="grid">
+    <!-- Left: Shorten form -->
+    <div>
+      <div class="card">
+        <h2><span class="dot"></span>Shorten a URL</h2>
+        <div class="input-row">
+          <label>Long URL</label>
+          <input id="url-input" placeholder="https://example.com/very/long/path" value="https://github.com/tiangolo/fastapi/blob/master/docs/en/docs/tutorial/first-steps.md">
+        </div>
+        <div class="input-row">
+          <label>Custom Code (optional)</label>
+          <input id="custom-code" placeholder="e.g. mygithub">
+        </div>
+        <div class="input-row">
+          <label>TTL (hours)</label>
+          <input id="ttl" type="number" value="168" min="1" max="8760">
+        </div>
+        <div class="btn-row">
+          <button class="btn-primary" onclick="shorten()">⚡ Shorten</button>
+          <button class="btn-sm" onclick="loadUrls()">Refresh List</button>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top:16px;">
+        <h2><span class="dot"></span>Redirect Tester</h2>
+        <div class="input-row">
+          <label>Short Code</label>
+          <input id="redirect-code" placeholder="e.g. aBcD123">
+        </div>
+        <div class="btn-row">
+          <button class="btn-primary" onclick="testRedirect()">→ Resolve</button>
+          <button class="btn-sm" onclick="getAnalytics()">📊 Analytics</button>
+        </div>
+        <div style="margin-top:12px;">
+          <label>Response</label>
+          <div class="response-box" id="redirect-resp">Waiting...</div>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top:16px;">
+        <h2><span class="dot"></span>Cache Stats</h2>
+        <div style="margin-bottom:8px;">
+          <label>Hit Rate</label>
+          <div class="progress-bar"><div class="progress-fill" id="hit-bar" style="width:0%"></div></div>
+        </div>
+        <div class="response-box" id="cache-resp" style="min-height:60px;">–</div>
+        <button class="btn-sm" style="margin-top:10px;" onclick="fetchCacheStats()">Refresh</button>
+      </div>
+    </div>
+
+    <!-- Right: URL list + concepts -->
+    <div>
+      <div class="card">
+        <h2><span class="dot"></span>All Short URLs</h2>
+        <ul class="url-list" id="url-list"><li style="color:var(--muted);font-size:13px;">Loading...</li></ul>
+      </div>
+
+      <div class="card" style="margin-top:16px;">
+        <h2><span class="dot"></span>Concepts in This Build</h2>
+        <div>
+          <span class="concept-chip">Base62 Encoding</span>
+          <span class="concept-chip">LRU Cache + TTL</span>
+          <span class="concept-chip">Cache-Aside Pattern</span>
+          <span class="concept-chip">Single-Flight</span>
+          <span class="concept-chip">Cache Stampede Prevention</span>
+          <span class="concept-chip">Token Bucket Rate Limiter</span>
+          <span class="concept-chip">Async Analytics Queue</span>
+          <span class="concept-chip">Collision Detection</span>
+          <span class="concept-chip">Idempotent Creation</span>
+          <span class="concept-chip">TTL Expiration</span>
+        </div>
+
+        <div style="margin-top:20px; padding:14px; background:var(--bg); border-radius:8px; font-size:12px; line-height:1.8; color:var(--muted);">
+          <strong style="color:var(--text);">🎯 Interview Talking Points</strong><br>
+          <strong style="color:var(--accent2);">Base62:</strong> 7 chars = 62⁷ ≈ 3.5T combos<br>
+          <strong style="color:var(--accent2);">Single-Flight:</strong> 1000 stampede requests → 1 DB read<br>
+          <strong style="color:var(--accent2);">Token Bucket:</strong> allows burst of 5, refills at 0.5/s<br>
+          <strong style="color:var(--accent2);">Async Queue:</strong> analytics don't block redirects
+        </div>
+      </div>
+
+      <div class="card" style="margin-top:16px;">
+        <h2><span class="dot"></span>Rate Limit Status</h2>
+        <div class="response-box" id="rl-resp">–</div>
+        <button class="btn-sm" style="margin-top:10px;" onclick="fetchRLStatus()">Check My Bucket</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const API = window.location.origin;
+let authToken = localStorage.getItem('hld_token') || '';
+
+function updateTokenStatus() {
+  const el = document.getElementById('token-status');
+  if (authToken) {
+    el.textContent = '✓ Token stored in localStorage';
+    el.style.color = 'var(--success)';
+  } else {
+    el.textContent = '⚠ No token — shorten will fail';
+    el.style.color = 'var(--warn)';
+  }
+}
+
+async function getToken() {
+  const userId = document.getElementById('user-id').value.trim() || 'demo_user';
+  try {
+    const r = await fetch(API + '/api/auth/token', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({user_id: userId})
+    });
+    const data = await r.json();
+    authToken = data.access_token;
+    localStorage.setItem('hld_token', authToken);
+    updateTokenStatus();
+    document.getElementById('token-resp').textContent = JSON.stringify(data, null, 2);
+    document.getElementById('token-resp').className = 'response-box success';
+  } catch(e) {
+    document.getElementById('token-resp').textContent = 'Error: ' + e.message;
+    document.getElementById('token-resp').className = 'response-box error';
+  }
+}
+
+async function api(method, path, body) {
+  const headers = {'Content-Type': 'application/json'};
+  if (authToken) headers['Authorization'] = 'Bearer ' + authToken;
+  const opts = {method, headers};
+  if (body) opts.body = JSON.stringify(body);
+  const r = await fetch(API + path, opts);
+  if (!r.ok && r.status === 401) {
+    const err = await r.json();
+    throw new Error(JSON.stringify(err.detail || err));
+  }
+  return r.json();
+}
+
+function fmt(obj) { return JSON.stringify(obj, null, 2); }
+
+async function shorten() {
+  const url  = document.getElementById('url-input').value.trim();
+  const code = document.getElementById('custom-code').value.trim();
+  const ttl  = parseInt(document.getElementById('ttl').value) || 168;
+  if (!url) return;
+  const body = { url, ttl_hours: ttl };
+  if (code) body.custom_code = code;
+  try {
+    const r = await api('POST', '/api/shorten', body);
+    document.getElementById('redirect-code').value = r.short_code || '';
+    setResp('redirect-resp', fmt(r), !r.detail);
+    loadUrls(); fetchCacheStats(); fetchStats();
+  } catch(e) { setResp('redirect-resp', e.message, false); }
+}
+
+async function testRedirect() {
+  const code = document.getElementById('redirect-code').value.trim();
+  if (!code) return;
+  try {
+    const r = await api('GET', '/r/' + code);
+    const tag = r.cache_hit ? '<span class="tag tag-hit">CACHE HIT</span>' : '<span class="tag tag-miss">CACHE MISS</span>';
+    document.getElementById('redirect-resp').innerHTML = tag + '\n' + fmt(r);
+    document.getElementById('redirect-resp').className = 'response-box success';
+    fetchCacheStats(); fetchStats();
+  } catch(e) { setResp('redirect-resp', e.message, false); }
+}
+
+async function getAnalytics() {
+  const code = document.getElementById('redirect-code').value.trim();
+  if (!code) return;
+  try {
+    const r = await api('GET', '/api/analytics/' + code);
+    setResp('redirect-resp', fmt(r), true);
+  } catch(e) { setResp('redirect-resp', e.message, false); }
+}
+
+async function fetchCacheStats() {
+  try {
+    const r = await api('GET', '/api/cache/stats');
+    const rate = parseFloat(r.hit_rate_pct) || 0;
+    document.getElementById('hit-bar').style.width = rate + '%';
+    document.getElementById('cache-resp').textContent = fmt(r);
+    document.getElementById('s-hit').textContent = rate + '%';
+    document.getElementById('s-dedup').textContent = r.single_flight_deduped || 0;
+  } catch(e) {}
+}
+
+async function fetchStats() {
+  try {
+    const r = await api('GET', '/api/urls');
+    document.getElementById('s-total').textContent = r.total || 0;
+  } catch(e) {}
+}
+
+async function fetchRLStatus() {
+  try {
+    const r = await api('GET', '/api/rate-limit/status');
+    document.getElementById('rl-resp').textContent = fmt(r);
+  } catch(e) {}
+}
+
+async function loadUrls() {
+  try {
+    const r = await api('GET', '/api/urls');
+    const list = document.getElementById('url-list');
+    list.innerHTML = '';
+    (r.urls || []).forEach(u => {
+      const li = document.createElement('li');
+      li.className = 'animate-in';
+      li.innerHTML = `
+        <span class="short-code">${u.short_code}</span>
+        <span class="orig-url" title="${u.original_url}">${u.original_url}</span>
+        <button class="btn-sm" onclick="document.getElementById('redirect-code').value='${u.short_code}'">Use</button>
+      `;
+      list.appendChild(li);
+    });
+  } catch(e) {}
+}
+
+function setResp(id, text, ok) {
+  const el = document.getElementById(id);
+  el.textContent = text;
+  el.className = 'response-box ' + (ok ? 'success' : 'error');
+}
+
+// Init
+updateTokenStatus();
+loadUrls(); fetchCacheStats(); fetchStats(); fetchRLStatus();
+setInterval(() => { fetchCacheStats(); fetchStats(); }, 5000);
+</script>
+</body>
+</html>
